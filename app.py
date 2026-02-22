@@ -5,7 +5,7 @@ import plotly.graph_objects as go
 import json
 
 # --- CONFIGURACIÓN INICIAL ---
-genai.configure(api_key="TU_API_KEY_AQUI")
+genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
 model = genai.GenerativeModel('gemini-1.5-flash')
 
 st.set_page_config(page_title="Auditor de Talento IA", layout="wide")
@@ -107,3 +107,4 @@ else:
                         "Pilar": ["Experiencia", "Educación", "Habilidades", "Fiabilidad"],
                         "Calificación": [res['experiencia'], res['educacion'], res['habilidades'], res['fiabilidad']]
                     })
+
