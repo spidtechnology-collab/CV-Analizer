@@ -6,16 +6,13 @@ import json
 from fpdf import FPDF
 from docx import Document
 from io import BytesIO
-
-Configuracion de API
-try:
 genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
 model = genai.GenerativeModel(
 model_name='gemini-1.5-flash',
 generation_config={"response_mime_type": "application/json"}
 )
 except Exception as e:
-st.error(f"Error de configuracion: {e}")
+st.error(f"Error: {e}")
 
 st.set_page_config(page_title="Auditor de Talento IA", layout="wide")
 
@@ -32,7 +29,6 @@ pdf.cell(190, 10, f"Candidato: {nombre}", ln=True)
 pdf.set_font("Arial", "", 10)
 resumen = str(res.get('resumen_reservas', '')).encode('latin-1', 'ignore').decode('latin-1')
 pdf.multi_cell(190, 7, f"Resumen: {resumen}")
-pdf.cell(190, 7, f"Score: {res.get('experiencia')}% Exp | {res.get('habilidades')}% Hab", ln=True)
 return pdf.output(dest='S').encode('latin-1', errors='replace')
 
 def generar_docx(resultados):
@@ -41,7 +37,6 @@ doc.add_heading('Evaluacion de Candidatos', 0)
 for res in resultados:
 doc.add_heading(f"Candidato: {res.get('nombre_candidato', 'N/A')}", level=1)
 doc.add_paragraph(f"Nota IA: {res.get('resumen_reservas', '')}")
-doc.add_paragraph(f"Puntajes: Exp: {res.get('experiencia')}% | Edu: {res.get('educacion')}%")
 bio = BytesIO()
 doc.save(bio)
 return bio.getvalue()
@@ -52,7 +47,7 @@ if "autorizado" not in st.session_state:
 st.session_state.autorizado = False
 
 if not st.session_state.autorizado:
-st.warning("### Aviso de Privacidad")
+st.warning("Aviso de Privacidad: Al continuar autoriza el uso de datos.")
 if st.button("Acepto los términos"):
 st.session_state.autorizado = True
 st.rerun()
