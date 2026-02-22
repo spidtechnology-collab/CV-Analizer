@@ -5,6 +5,7 @@ import json
 from fpdf import FPDF
 
 try:
+
 genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
 model = genai.GenerativeModel('gemini-1.5-flash')
 except Exception as e:
@@ -35,3 +36,4 @@ st.rerun()
 else:
 vacante = st.sidebar.text_area("Puesto:")
 archivos = st.file_uploader("Subir CVs", type="pdf", accept_multiple_files=True)
+
