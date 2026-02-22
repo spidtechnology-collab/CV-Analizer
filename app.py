@@ -7,7 +7,6 @@ from fpdf import FPDF
 from docx import Document
 from io import BytesIO
 
-Configuracion de la API
 try:
 genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
 model = genai.GenerativeModel(
@@ -15,7 +14,7 @@ model_name='gemini-1.5-flash',
 generation_config={"response_mime_type": "application/json"}
 )
 except Exception as e:
-st.error(f"Error de configuracion: {e}")
+st.error(f"Error: {e}")
 
 st.set_page_config(page_title="Auditor de Talento IA", layout="wide")
 
