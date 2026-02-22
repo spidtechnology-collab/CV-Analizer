@@ -4,7 +4,6 @@ from pypdf import PdfReader
 import json
 from fpdf import FPDF
 
-Configuración técnica
 try:
 genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
 model = genai.GenerativeModel('gemini-1.5-flash')
@@ -30,10 +29,9 @@ if "ok" not in st.session_state:
 st.session_state.ok = False
 
 if not st.session_state.ok:
-st.warning("Debe aceptar los terminos para continuar.")
-if st.button("Aceptar Terminos y Entrar"):
+if st.button("Aceptar e Ingresar"):
 st.session_state.ok = True
 st.rerun()
 else:
-vacante = st.sidebar.text_area("Describa el puesto buscado:")
-archivos = st.file_uploader("Subir CVs (PDF)", type="pdf", accept_multiple_files=True)
+vacante = st.sidebar.text_area("Puesto:")
+archivos = st.file_uploader("Subir CVs", type="pdf", accept_multiple_files=True)
