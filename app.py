@@ -3,54 +3,116 @@ import google.generativeai as genai
 from pypdf import PdfReader
 from fpdf import FPDF
 
-# 1. IMPORTANTE: st.set_page_config DEBE ser el primer comando de Streamlit
-st.set_page_config(page_title="Analizador", layout="wide")
+# 1. Configuración de página
+st.set_page_config(page_title="Auditor de Talento", layout="wide")
 
-# Configuración de API con manejo de errores
+# 2. Configuración de API
 try:
     genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
     model = genai.GenerativeModel('gemini-1.5-flash')
 except Exception as e:
-    st.error(f"Error de configuración: {e}")
+    st.error("Error: Configura 'GOOGLE_API_KEY' en los secrets de Streamlit.")
 
-def get_pdf(data):
+# Función para extraer texto de PDF
+def extract_text(pdf_file):
+    reader = PdfReader(pdf_file)
+    text = ""
+    for page in reader.pages:
+        text += page.extract_text()
+    return text
+
+# Función para generar el PDF de reporte
+def create_report_pdf(data):
     pdf = FPDF()
     pdf.add_page()
-    # Usamos 'Arial' (fpdf1) o 'helvetica' (fpdf2). 'helvetica' es más estándar.
+    pdf.set_font("helvetica", "B", 16)
+    pdf.cell(0, 10, "Reporte de Análisis de Candidatos", ln=True, align='C')
+    pdf.ln(10)
+    
     pdf.set_font("helvetica", size=12)
-    pdf.cell(200, 10, txt="Reporte de Candidatos", ln=1, align='C')
-    
     for r in data:
-        nombre = str(r.get('nombre', 'N/A'))
-        nota = str(r.get('nota', 'N/A'))
-        # Añadimos contenido
-        pdf.multi_cell(0, 10, txt=f"Nombre: {nombre}\nAnalisis: {nota}\n---")
+        pdf.set_font("helvetica", "B", 12)
+        pdf.cell(0, 10, f"Candidato: {r['nombre']}", ln=True)
+        pdf.set_font("helvetica", size=11)
+        pdf.multi_cell(0, 8, txt=f"Análisis:\n{r['nota']}")
+        pdf.ln(5)
+        pdf.cell(0, 0, "", "T", ln=True) # Línea divisoria
+        pdf.ln(5)
     
-    # Retornamos los bytes del PDF
     return pdf.output(dest='S')
 
+# --- INTERFAZ DE USUARIO ---
 st.title("🛡️ Auditor de Talento")
 
-# Lógica de sesión
 if "ok" not in st.session_state:
     st.session_state.ok = False
 
 if not st.session_state.ok:
-    st.info("Bienvenido al Auditor de Talento. Por favor, acepta para continuar.")
+    st.info("Bienvenido. Por favor, acepta para continuar.")
     if st.button("Aceptar e Ingresar"):
         st.session_state.ok = True
         st.rerun()
 else:
-    # Interfaz principal una vez aceptado
     with st.sidebar:
-        vacante = st.text_area("Descripción del Puesto:")
+        vacante = st.text_area("Descripción del Puesto (Requerimientos):", height=300)
         st.divider()
         if st.button("Cerrar Sesión"):
             st.session_state.ok = False
             st.rerun()
 
-    archivos = st.file_uploader("Subir CVs", type="pdf", accept_multiple_files=True)
+    archivos = st.file_uploader("Subir CVs (Formatos PDF)", type="pdf", accept_multiple_files=True)
 
     if archivos and vacante:
-        st.success(f"Se han cargado {len(archivos)} archivos. ¡Listo para analizar!")
-        # Aquí iría tu lógica para procesar los PDF con PdfReader y Gemini
+        if st.button("🚀 Iniciar Análisis con IA"):
+            resultados = []
+            progreso = st.progress(0)
+            
+            for i, archivo in enumerate(archivos):
+                with st.spinner(f"Analizando {archivo.name}..."):
+                    # Extraer texto del CV
+                    texto_cv = extract_text(archivo)
+                    
+                    # Prompt para Gemini
+                    prompt = f"""
+                    Actúa como un reclutador experto. Compara el siguiente CV con la descripción de la vacante.
+                    
+                    VACANTE:
+                    {vacante}
+                    
+                    CV:
+                    {texto_cv}
+                    
+                    PROPORCIONA:
+                    1. Un resumen de compatibilidad (0 a 100%).
+                    2. Puntos fuertes y debilidades.
+                    3. Conclusión de si es apto o no.
+                    Se breve y directo.
+                    """
+                    
+                    try:
+                        response = model.generate_content(prompt)
+                        resultados.append({
+                            "nombre": archivo.name,
+                            "nota": response.text
+                        })
+                    except Exception as e:
+                        st.error(f"Error con {archivo.name}: {e}")
+                
+                progreso.progress((i + 1) / len(archivos))
+
+            # Mostrar resultados en pantalla
+            st.divider()
+            st.subheader("Resultados del Análisis")
+            
+            for res in resultados:
+                with st.expander(f"📄 Candidato: {res['nombre']}"):
+                    st.markdown(res['nota'])
+
+            # Botón para descargar reporte
+            pdf_bytes = create_report_pdf(resultados)
+            st.download_button(
+                label="📥 Descargar Reporte en PDF",
+                data=pdf_bytes,
+                file_name="analisis_talento.pdf",
+                mime="application/pdf"
+            )
