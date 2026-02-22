@@ -3,16 +3,14 @@ import google.generativeai as genai
 from pypdf import PdfReader
 import json
 from fpdf import FPDF
-from io import BytesIO
 
-1. Configuracion de la API
+Configuración técnica
 try:
 genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
 model = genai.GenerativeModel('gemini-1.5-flash')
 except Exception as e:
-st.error(f"Error de configuracion: {e}")
+st.error(f"Error: {e}")
 
-2. Configuracion de la Pagina
 st.set_page_config(page_title="Analizador", layout="wide")
 
 def get_pdf(data):
@@ -28,7 +26,6 @@ return pdf.output(dest='S').encode('latin-1', 'replace')
 
 st.title("🛡️ Auditor de Talento")
 
-3. Logica de Acceso
 if "ok" not in st.session_state:
 st.session_state.ok = False
 
@@ -38,6 +35,5 @@ if st.button("Aceptar Terminos y Entrar"):
 st.session_state.ok = True
 st.rerun()
 else:
-# 4. Interfaz de Usuario
 vacante = st.sidebar.text_area("Describa el puesto buscado:")
 archivos = st.file_uploader("Subir CVs (PDF)", type="pdf", accept_multiple_files=True)
