@@ -3,116 +3,145 @@ import google.generativeai as genai
 from pypdf import PdfReader
 from fpdf import FPDF
 
-# 1. Configuración de página
+# 1. CONFIGURACIÓN DE PÁGINA (Debe ser lo primero)
 st.set_page_config(page_title="Auditor de Talento", layout="wide")
 
-# 2. Configuración de API
+# 2. CONFIGURACIÓN DE API
 try:
+    # Intenta obtener la clave desde los secrets de Streamlit
     genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
     model = genai.GenerativeModel('gemini-1.5-flash')
 except Exception as e:
-    st.error("Error: Configura 'GOOGLE_API_KEY' en los secrets de Streamlit.")
+    st.error("⚠️ Error de configuración: Asegúrate de tener 'GOOGLE_API_KEY' en los Secrets de Streamlit.")
 
-# Función para extraer texto de PDF
-def extract_text(pdf_file):
-    reader = PdfReader(pdf_file)
-    text = ""
-    for page in reader.pages:
-        text += page.extract_text()
-    return text
+# --- FUNCIONES DE AYUDA ---
 
-# Función para generar el PDF de reporte
-def create_report_pdf(data):
+def extraer_texto_pdf(archivo_pdf):
+    """Extrae todo el texto de un archivo PDF subido."""
+    try:
+        reader = PdfReader(archivo_pdf)
+        texto = ""
+        for pagina in reader.pages:
+            texto_pag = pagina.extract_text()
+            if texto_pag:
+                texto += texto_pag
+        return texto
+    except Exception as e:
+        return f"Error al leer el PDF: {e}"
+
+def generar_pdf_reporte(datos_analisis):
+    """Crea un PDF con los resultados usando fpdf2."""
     pdf = FPDF()
     pdf.add_page()
+    
+    # Título del documento
     pdf.set_font("helvetica", "B", 16)
-    pdf.cell(0, 10, "Reporte de Análisis de Candidatos", ln=True, align='C')
+    pdf.cell(0, 10, "Reporte de Auditoria de Talento", ln=True, align='C')
     pdf.ln(10)
     
-    pdf.set_font("helvetica", size=12)
-    for r in data:
+    for item in datos_analisis:
+        # Nombre del candidato
         pdf.set_font("helvetica", "B", 12)
-        pdf.cell(0, 10, f"Candidato: {r['nombre']}", ln=True)
-        pdf.set_font("helvetica", size=11)
-        pdf.multi_cell(0, 8, txt=f"Análisis:\n{r['nota']}")
+        pdf.cell(0, 10, f"Candidato: {item['nombre']}", ln=True)
+        
+        # Resultado del análisis
+        pdf.set_font("helvetica", size=10)
+        # multi_cell maneja párrafos largos automáticamente
+        pdf.multi_cell(0, 8, txt=item['analisis'])
         pdf.ln(5)
         pdf.cell(0, 0, "", "T", ln=True) # Línea divisoria
         pdf.ln(5)
     
-    return pdf.output(dest='S')
+    # Retorna los bytes del PDF generado
+    return pdf.output()
 
-# --- INTERFAZ DE USUARIO ---
+# --- INTERFAZ DE USUARIO (UI) ---
+
 st.title("🛡️ Auditor de Talento")
 
-if "ok" not in st.session_state:
-    st.session_state.ok = False
+# Manejo de sesión (Aceptación de términos)
+if "autenticado" not in st.session_state:
+    st.session_state.autenticado = False
 
-if not st.session_state.ok:
-    st.info("Bienvenido. Por favor, acepta para continuar.")
+if not st.session_state.autenticado:
+    st.info("Bienvenido al sistema de análisis de CVs. Por favor, confirma para entrar.")
     if st.button("Aceptar e Ingresar"):
-        st.session_state.ok = True
+        st.session_state.autenticado = True
         st.rerun()
 else:
+    # Barra lateral para la descripción de la vacante
     with st.sidebar:
-        vacante = st.text_area("Descripción del Puesto (Requerimientos):", height=300)
+        st.header("Configuración")
+        descripcion_puesto = st.text_area("Descripción de la Vacante:", height=300, 
+                                          placeholder="Pega aquí los requisitos del puesto...")
         st.divider()
         if st.button("Cerrar Sesión"):
-            st.session_state.ok = False
+            st.session_state.autenticado = False
             st.rerun()
 
-    archivos = st.file_uploader("Subir CVs (Formatos PDF)", type="pdf", accept_multiple_files=True)
+    # Área principal para subir archivos
+    archivos_cvs = st.file_uploader("Sube los CVs de los candidatos (PDF)", 
+                                    type="pdf", 
+                                    accept_multiple_files=True)
 
-    if archivos and vacante:
+    if archivos_cvs and descripcion_puesto:
         if st.button("🚀 Iniciar Análisis con IA"):
             resultados = []
-            progreso = st.progress(0)
+            barra_progreso = st.progress(0)
             
-            for i, archivo in enumerate(archivos):
-                with st.spinner(f"Analizando {archivo.name}..."):
-                    # Extraer texto del CV
-                    texto_cv = extract_text(archivo)
+            for index, cv in enumerate(archivos_cvs):
+                with st.spinner(f"Analizando: {cv.name}..."):
+                    # 1. Extraer texto
+                    texto_cv = extraer_texto_pdf(cv)
                     
-                    # Prompt para Gemini
+                    # 2. Preparar el envío a Gemini
                     prompt = f"""
-                    Actúa como un reclutador experto. Compara el siguiente CV con la descripción de la vacante.
+                    Eres un experto en Recursos Humanos. Analiza la compatibilidad del candidato con la vacante.
                     
                     VACANTE:
-                    {vacante}
+                    {descripcion_puesto}
                     
-                    CV:
+                    CV DEL CANDIDATO:
                     {texto_cv}
                     
-                    PROPORCIONA:
-                    1. Un resumen de compatibilidad (0 a 100%).
-                    2. Puntos fuertes y debilidades.
-                    3. Conclusión de si es apto o no.
-                    Se breve y directo.
+                    ENTREGA UN RESUMEN QUE INCLUYA:
+                    - % de compatibilidad.
+                    - 3 Puntos fuertes.
+                    - 3 Áreas de mejora o faltantes.
+                    - Veredicto final (Apto / No apto).
                     """
                     
                     try:
-                        response = model.generate_content(prompt)
+                        respuesta = model.generate_content(prompt)
                         resultados.append({
-                            "nombre": archivo.name,
-                            "nota": response.text
+                            "nombre": cv.name,
+                            "analisis": respuesta.text
                         })
                     except Exception as e:
-                        st.error(f"Error con {archivo.name}: {e}")
+                        st.error(f"Error procesando {cv.name}: {e}")
                 
-                progreso.progress((i + 1) / len(archivos))
+                # Actualizar barra de progreso
+                barra_progreso.progress((index + 1) / len(archivos_cvs))
+
+            st.success("¡Análisis completado!")
+            st.divider()
 
             # Mostrar resultados en pantalla
-            st.divider()
-            st.subheader("Resultados del Análisis")
-            
             for res in resultados:
-                with st.expander(f"📄 Candidato: {res['nombre']}"):
-                    st.markdown(res['nota'])
+                with st.expander(f"Ver análisis de: {res['nombre']}"):
+                    st.markdown(res['analisis'])
 
-            # Botón para descargar reporte
-            pdf_bytes = create_report_pdf(resultados)
-            st.download_button(
-                label="📥 Descargar Reporte en PDF",
-                data=pdf_bytes,
-                file_name="analisis_talento.pdf",
-                mime="application/pdf"
-            )
+            # Botón para descargar el reporte final
+            try:
+                reporte_pdf = generar_pdf_reporte(resultados)
+                st.download_button(
+                    label="📥 Descargar Reporte Completo (PDF)",
+                    data=bytes(reporte_pdf),
+                    file_name="analisis_talento_ia.pdf",
+                    mime="application/pdf"
+                )
+            except Exception as e:
+                st.error(f"No se pudo generar el archivo PDF descargable: {e}")
+    
+    elif not descripcion_puesto and archivos_cvs:
+        st.warning("⚠️ Por favor, ingresa la descripción de la vacante en la barra lateral.")
