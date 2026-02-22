@@ -17,7 +17,7 @@ st.set_page_config(page_title="Auditor de Talento", layout="wide", page_icon="�
 try:
     if "GOOGLE_API_KEY" in st.secrets:
         genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
-        model = genai.GenerativeModel('gemini-1.0-pro')
+        model = genai.GenerativeModel(model_name='models/gemini-pro')
     else:
         st.warning("⚠️ Configura 'GOOGLE_API_KEY' en los Secrets de Streamlit.")
 except Exception as e:
@@ -100,6 +100,7 @@ else:
     
     elif archivos and not vacante:
         st.warning("⚠️ Por favor, ingresa la descripción de la vacante.")
+
 
 
 
